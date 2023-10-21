@@ -3,7 +3,7 @@
 # Based on this CURL code: 
 # curl -X POST https://api.together.xyz/inference \
 #-H 'Content-Type: application/json' \
-#-H 'Authorization: Bearer 8f93d2cd823d0bb7d8f2a0668299b249a1fdb368075b596bfd23f08b14b07200' \
+#-H 'Authorization: Bearer XXXX' \
 #-d '{
 #"model": "togethercomputer/llama-2-70b-chat",
 #"max_tokens": 512,
@@ -50,7 +50,7 @@ function together_inference(model, max_tokens, prompt, request_type, temperature
     # Convert the request to JSON
     request_json = JSON.json(request)
     # Build the HTTP request
-    r = HTTP.request("POST", "https://api.together.xyz/inference", ["Content-Type" => "application/json", "Authorization" => "Bearer 8f93d2cd823d0bb7d8f2a0668299b249a1fdb368075b596bfd23f08b14b07200"], request_json)
+    r = HTTP.request("POST", "https://api.together.xyz/inference", ["Content-Type" => "application/json", "Authorization" => "Bearer $TOGETHER_API_KEY"], request_json)
     # Convert the response to JSON
     response_json = JSON.parse(String(r.body))
     # Return the response

@@ -79,6 +79,7 @@ function request_body_live(url; method, input, headers, streamcallback, kwargs..
             r = HTTP.startread(stream) # start reading the response
             isdone = false
 
+
             while !eof(stream) || !isdone
                 # Extract all available messages
                 masterchunk = String(readavailable(stream))
@@ -87,18 +88,6 @@ function request_body_live(url; method, input, headers, streamcallback, kwargs..
                 # Occasionally, the streaming will append multiple messages together,
                 # and iterating through each line in turn will make sure that
                 # streamingcallback is called on each message in turn.
-                for chunk in eachline(IOBuffer(masterchunk))
-                    streamcallback(chunk)
-                end
-
-                # Check if we're done
-                isdone = JSON3.read(masterchunk)["done"]
-            end
-        end
-    end
-
-    return resp, body
-end
                 chunks = String.(filter(!isempty, split(masterchunk, "\n")))
 
                 # Iterate through each chunk in turn.
@@ -128,7 +117,7 @@ function status_error(resp, log=nothing)
     error("request status $(resp.message)$logs")
 end
 
-function _request(api::AbstractString, provider::AbstractOpenAIProvider, api_key::AbstractString=provider.api_key; method, http_kwargs, streamcallback=nothing, kwargs...)
+function _request(api::AbstractString, provider::AbstractTogetherProvider, api_key::AbstractString=provider.api_key; method, http_kwargs, streamcallback=nothing, kwargs...)
     # add stream: True to the API call if a stream callback function is passed
     if !isnothing(streamcallback)
         kwargs = (kwargs..., stream=true)
@@ -147,7 +136,7 @@ function _request(api::AbstractString, provider::AbstractOpenAIProvider, api_key
         status_error(resp, body)
     else
         return if isnothing(streamcallback)
-            OpenAIResponse(resp.status, JSON3.read(body))
+            TogetherResponse(resp.status, JSON3.read(body))
         else
             # assemble the streaming response body into a proper JSON object
             lines = split(body, "\n") # split body into lines
@@ -158,42 +147,42 @@ function _request(api::AbstractString, provider::AbstractOpenAIProvider, api_key
             # read each line, which looks like "data: {<json elements>}"
             parsed = map(line -> JSON3.read(line[6:end]), lines)
 
-            OpenAIResponse(resp.status, parsed)
+            TogetherResponse(resp.status, parsed)
         end
 
     end
 end
 
-function openai_request(api::AbstractString, api_key::AbstractString; method, http_kwargs, streamcallback=nothing, kwargs...)
+function together_request(api::AbstractString, api_key::AbstractString; method, http_kwargs, streamcallback=nothing, kwargs...)
     global DEFAULT_PROVIDER
     _request(api, DEFAULT_PROVIDER, api_key; method, http_kwargs, streamcallback=streamcallback, kwargs...)
 end
 
-function openai_request(api::AbstractString, provider::AbstractOpenAIProvider; method, http_kwargs, streamcallback=nothing, kwargs...)
+function together_request(api::AbstractString, provider::AbstractTogetherProvider; method, http_kwargs, streamcallback=nothing, kwargs...)
     _request(api, provider; method, http_kwargs, streamcallback=streamcallback, kwargs...)
 end
 
-struct OpenAIResponse{R}
+struct TogetherResponse{R}
     status::Int16
     response::R
 end
 
 """
 Default model ID for embeddings.
-Follows recommendation in OpenAI docs at <https://platform.openai.com/docs/models/embeddings>.
+Follows recommendation in Together docs at <>.
 """
-const DEFAULT_EMBEDDING_MODEL_ID = "text-embedding-ada-002"
+const DEFAULT_EMBEDDING_MODEL_ID = "need-to-find-one"
 
 """
 List models
 
 # Arguments:
-- `api_key::String`: OpenAI API key
+- `api_key::String`: Together API key
 
 For additional details, visit <https://platform.openai.com/docs/api-reference/models/list>
 """
 function list_models(api_key::String; http_kwargs::NamedTuple=NamedTuple())
-    return openai_request("models", api_key; method="GET", http_kwargs=http_kwargs)
+    return together_request("models", api_key; method="GET", http_kwargs=http_kwargs)
 end
 
 """
@@ -213,7 +202,7 @@ end
 Create completion
 
 # Arguments:
-- `api_key::String`: OpenAI API key
+- `api_key::String`: Together API key
 - `model_id::String`: Model id
 
 # Keyword Arguments (check the OpenAI docs for the exhaustive list):
@@ -226,7 +215,7 @@ For more details about the endpoint and additional arguments, visit <https://pla
 - `http_kwargs::NamedTuple=NamedTuple()`: Keyword arguments to pass to HTTP.request (e. g., `http_kwargs=(connection_timeout=2,)` to set a connection timeout of 2 seconds).
 """
 function create_completion(api_key::String, model_id::String; http_kwargs::NamedTuple=NamedTuple(), kwargs...)
-    return openai_request("completions", api_key; method="POST", http_kwargs=http_kwargs, model=model_id, kwargs...)
+    return together_request("completions", api_key; method="POST", http_kwargs=http_kwargs, model=model_id, kwargs...)
 end
 
 """
@@ -300,7 +289,7 @@ julia> map(r->r["choices"][1]["delta"], CC.response)
 ```
 """
 function create_chat(api_key::String, model_id::String, messages; http_kwargs::NamedTuple=NamedTuple(), streamcallback=nothing, kwargs...)
-    return openai_request("chat/completions", api_key; method="POST", http_kwargs=http_kwargs, model=model_id, messages=messages, streamcallback=streamcallback, kwargs...)
+    return together_request("togethercomputer/llama-2-70b-chat", api_key; method="POST", http_kwargs=http_kwargs, model=model_id, messages=messages, streamcallback=streamcallback, kwargs...)
 end
 function create_chat(provider::AbstractOpenAIProvider, model_id::String, messages; http_kwargs::NamedTuple=NamedTuple(), streamcallback=nothing, kwargs...)
     return openai_request("chat/completions", provider; method="POST", http_kwargs=http_kwargs, model=model_id, messages=messages, streamcallback=streamcallback, kwargs...)
